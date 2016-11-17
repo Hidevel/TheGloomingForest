@@ -1,0 +1,12 @@
+1.) collision detection - handleCollision
+
+2.) function that adds mushroom based on tree places
+
+trees stored in a treesArray
+mushrooms the same
+
+
+..... .)
+	animation on camera change (steps)
+	trees with mass, they ar moving!!!!!!
+	terrain
