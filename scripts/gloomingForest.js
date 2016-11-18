@@ -262,7 +262,7 @@ initScene=function() {
 		
 		//generataes a random coordinate
 		coordGenerator = function (mapSize,storedCoordiantes){
-			var newCoordinate=Math.floor(49 - 98 * Math.random());
+			var newCoordinate=Math.floor(48 - 96 * Math.random());
 				
 			if(storedCoordiantes.includes(newCoordinate)){
 				newCoordinate+=1;
