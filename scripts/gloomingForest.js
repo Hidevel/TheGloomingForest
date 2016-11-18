@@ -13,7 +13,18 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 	
 	//scene basics variables
 	var scene, renderer, render_stats, physics_stats, textureLoader, 
-		ambientLight, pointlight, camera, cameraDistanceToPlayer;
+		ambientLight, 
+		pointlightSpiritUp, 
+		pointlightSpiritDown,
+		pointlightSpiritFront,
+		pointlightSpiritBack,
+		pointlightSpiritLeft,
+		pointlightSpiritRight,
+		camera, 
+		cameraDistanceToPlayer3rdPerson,
+		cameraLookAt3rdPerson,
+		cameraDistanceFromPlayerYCoord,
+		cameraLookAt1stPerson;
 	
 		//size variables
 		var mapSize;//size of the map
@@ -40,7 +51,9 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 
 	//player related variables
 	var keyboard = {};
-
+	
+	var brightness, lightIntesity, lightDistance;
+	
 	var cam3; //camera is set in third person view or first person view
 
 	/*holds details about height, 
@@ -48,8 +61,10 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 	rotation speed and current rotation 
 	of the player respectively*/
 	var player = {height: 2.0, 
-					movementSpeed: 30.0, movement:0.0, 
-					rotationSpeed: Math.PI*0.005, rotation:0.0
+					movementSpeed: 30.0, 
+					movement:0.0, 
+					rotationSpeed: Math.PI*0.005, 
+					rotation:0.0
 	};
 
 
@@ -58,7 +73,7 @@ Nice, long descriptions can be written this way
 ***/
 initScene=function() {
 	
-	renderer = new THREE.WebGLRenderer({ antialias: false });
+	renderer = new THREE.WebGLRenderer({ antialias: true });
 	renderer.setSize(window.innerWidth, window.innerHeight);
 	
 	//enable shadows
@@ -80,18 +95,21 @@ initScene=function() {
 		physics_stats.domElement.style.zIndex = 100;
 	document.getElementById( 'viewport' ).appendChild( physics_stats.domElement );
 
-	scene = new Physijs.Scene;
+	scene = new Physijs.Scene({fixedTimeStep:1/60});
 	scene.setGravity(new THREE.Vector3( 0, -100, 0 ));
 	scene.addEventListener(
 		'update',
 		function() {
-		scene.simulate( undefined, 1 );
+		scene.simulate( undefined, 2 );
 		physics_stats.update();
 		}
 	);	
 	
 	camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-	cameraDistanceToPlayer=5;
+		cameraDistanceToPlayer3rdPerson=6;
+		cameraLookAt3rdPerson=4;
+		cameraDistanceFromPlayerYCoord=4;
+		cameraLookAt1stPerson=5;
 	scene.add(camera);
 	
 	
@@ -176,13 +194,18 @@ initScene=function() {
 						0.8 //restitution
 			);
 			
-			spiritGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2);
+			spiritGeometry = new THREE.CylinderGeometry(0.5, 0.5, player.height,32,32);
 			
 			spiritMaterial = Physijs.createMaterial(
 					new THREE.MeshPhongMaterial(
-					{ color:0x33ff66}),
-					0.3, //friction
-					1.0 //restitution
+					{color:0xf4b642,
+					specular:0xf4b642,
+					transparent: true,
+					opcity:0.8,
+					shininess:100
+					}),
+					0.5, //friction
+					0.0 //restitution
 			);
 	
 	// Ground
@@ -197,17 +220,8 @@ initScene=function() {
 	
 	
 	
-	ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+	ambientLight = new THREE.HemisphereLight(0x053327, 0x287260,0.2);
 	scene.add(ambientLight);
-	
-	pointlight = new THREE.PointLight(0xffffff, 1.0);
-	//PointLight( color, intensity, distance, decay )
-	pointlight.position.set(0, 20, 0);
-	pointlight.castShadow = true;
-	//maximum draw distance for the shadows to something reasonable
-	pointlight.shadow.camera.near = 0.1;
-	pointlight.shadow.camera.far = 50;
-	scene.add(pointlight);
 	
 	addObjects();	
 	
@@ -230,7 +244,7 @@ initScene=function() {
 		spirit.position.y += 2.0;
 		spirit.receiveShadow = true; //meshes - object both receive
 		spirit.castShadow = true; // and cast shadows
-		//spirit.setCcdMotionThreshold(1);
+		spirit.setCcdMotionThreshold(1);
 		spirit.setCcdSweptSphereRadius(1);
 		spirit.addEventListener('ready',function(){
 			spirit.addEventListener('collision',handleCollision);
@@ -243,6 +257,37 @@ initScene=function() {
 		);
 		scene.addConstraint( constraint );*/
 		
+		
+		//adds lighting to the spirit
+		/*
+		intensity && distance <- at brightness
+		0.2 && 5 <- at min brightness
+		0.4 && 25 <- at max brightness
+		scales:
+			- intensity: 0.2 0.25 0.3 0.35 0.4
+			- distance: 5 10 15 20 25
+		*/
+		pointlightSpiritUp		= 	new THREE.PointLight(0xeeeeff, 0.4, 22,1);
+		pointlightSpiritDown	= 	new THREE.PointLight(0xeeeeff, 0.4, 28,1);
+		pointlightSpiritFront	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1);
+		pointlightSpiritBack	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1);
+		pointlightSpiritLeft	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1);
+		pointlightSpiritRight	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1); //PointLight( color, intensity, distance, decay )
+		
+		pointlightSpiritUp.position.set(0, player.height+2, 0);
+		pointlightSpiritDown.position.set(0, player.height/20, 0);
+		pointlightSpiritFront.position.set(0, player.height/2, 3);
+		pointlightSpiritBack.position.set(0, player.height/2, -3);
+		pointlightSpiritLeft.position.set(-3, player.height/2, 0);
+		pointlightSpiritRight.position.set(3, player.height/2, 0);
+	
+		spirit.add(pointlightSpiritUp);
+		spirit.add(pointlightSpiritDown);
+		spirit.add(pointlightSpiritFront);
+		spirit.add(pointlightSpiritBack);
+		spirit.add(pointlightSpiritLeft);
+		spirit.add(pointlightSpiritRight);
+			
 		
 		scene.add(spirit);			
 		
@@ -444,25 +489,35 @@ render = function() {
 			//follow the players movement form 3rd or first person
 		if(cam3){
 			camera.position.set(
-				spirit.position.x - (Math.sin(player.rotation)*cameraDistanceToPlayer),
-				player.height + 1,
-				spirit.position.z - (Math.cos(player.rotation)*cameraDistanceToPlayer)
+				spirit.position.x - (Math.sin(player.rotation)*cameraDistanceToPlayer3rdPerson),
+				player.height + cameraDistanceFromPlayerYCoord,
+				spirit.position.z - (Math.cos(player.rotation)*cameraDistanceToPlayer3rdPerson)
+			);
+			
+			//look where the player looks in 3rd person
+			camera.lookAt(
+			new THREE.Vector3(
+				spirit.position.x + Math.sin(player.rotation)*cameraLookAt3rdPerson,
+				player.height,
+				spirit.position.z + Math.cos(player.rotation)*cameraLookAt3rdPerson
+				)
 			);
 		}
 		else{
 			camera.position.set(spirit.position.x,
-								player.height,
+								player.height-(player.height/20),
 								spirit.position.z);
+			//look where the player looks
+			camera.lookAt(
+			new THREE.Vector3(
+				spirit.position.x + Math.sin(player.rotation)*cameraLookAt1stPerson,
+				0,
+				spirit.position.z + Math.cos(player.rotation)*cameraLookAt1stPerson
+				)
+			);
 		}
 			
-			//look where the player looks
-		camera.lookAt(
-		new THREE.Vector3(
-			spirit.position.x + Math.sin(player.rotation)*cameraDistanceToPlayer,
-			player.height,
-			spirit.position.z + Math.cos(player.rotation)*cameraDistanceToPlayer
-			)
-		);
+			
 	}
 		
 //EVENT HANDLER FUNCTIONS
