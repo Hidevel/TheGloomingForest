@@ -6,6 +6,9 @@ trees stored in a treesArray
 mushrooms the same
 
 
+... .)
+	resizing window
+
 ..... .)
 	animation on camera change (steps)
 	trees with mass, they ar moving!!!!!!

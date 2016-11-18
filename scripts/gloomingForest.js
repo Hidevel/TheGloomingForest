@@ -1,6 +1,5 @@
 'use strict';
 
-
 Physijs.scripts.worker = 'scripts/physijs_worker.js';
 
 //VARIABLES
@@ -22,9 +21,9 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 		var numObject = 100; //how many trees and mushrooms will be there together
 		
 			//array of already occupied coordinates
-		var randomCoordinates=new Array(2);//we will store x and y coordiantes
-			for(var i=0;i<numObject;i++){
-				randomCoordinates[i]=new Array(numObject); //coordinates for every object
+		var randomCoordinates = new Array(2);//we will store x and y coordiantes
+			for(var i = 0; i < 2; i++){
+				randomCoordinates[i] = new Array(numObject); //coordinates for every object
 		}
 		
 		//gometry, material and mesh variables
@@ -35,9 +34,7 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 			mushroomCap, mushroomCapGeometry, mushroomcapMaterial, //mushroomCap
 			spirit, spiritGeometry, spiritMaterial; //spirit/player
 			
-			/***
-			dfhifhdhjldkfhldsfjsdlkfksdl
-			***/
+			
 			
 			//geometry and material definitions
 				//ground
@@ -45,8 +42,8 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 			
 			groundMaterial = Physijs.createMaterial(
 				new THREE.MeshLambertMaterial({ color:0xffffff }),
-				.0, // high friction
-				.0 // low restitution
+				0.8, // high friction
+				0.3 // low restitution
 			);
 				
 				//tree
@@ -56,7 +53,7 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 					new THREE.MeshPhongMaterial(
 					{color:0x60351c}),
 					1.0, //friction
-					.0 //restitution
+					0.3 //restitution
 			);
 			
 			branchGeometry=new THREE.SphereGeometry(4);
@@ -65,26 +62,26 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 						new THREE.MeshPhongMaterial(
 						{color:0x1c601e}),
 						1.0, //friction
-						.0 //restitution
+						0.3 //restitution
 			);
 			
 				//mushroom
-			mushroomTrunkGeometry = new THREE.CylinderGeometry(0.2, 0.22, 0.5);
+			mushroomTrunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.5);
 			
 			mushroomTrunkMaterial = Physijs.createMaterial(
 						new THREE.MeshPhongMaterial(
 						{color:0xfff6e2}),
-						1.0, //friction
-						1.0 //restitution
+						0.1, //friction
+						0.8 //restitution
 			); 
 			
-			mushroomCapGeometry= new THREE.SphereGeometry(0.5,8,6,0,Math.PI*2,0,Math.PI/2);
+			mushroomCapGeometry= new THREE.SphereGeometry(0.5,10,10,0,Math.PI*2,0,Math.PI/2);
 			
 			mushroomcapMaterial = Physijs.createMaterial(
 						new THREE.MeshPhongMaterial(
 						{color:0xf9e2ff}),
-						1.0, //friction
-						1.0 //restitution
+						0.1, //friction
+						0.8 //restitution
 			);
 			
 			spiritGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2);
@@ -92,23 +89,26 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 			spiritMaterial = Physijs.createMaterial(
 					new THREE.MeshPhongMaterial(
 					{ color:0x33ff66}),
-					.0, //friction
-					.0 //restitution
+					0.0, //friction
+					1.0 //restitution
 			);
 
-var objects = [];
+var trees = [];
+var mushrooms = [];
 
 var keyboard = {};
 
 var cam3 = true; //camera is set in third person view
 
 var player = {height: 2.0, 
-				movementSpeed: 5.0, movement:0.0, 
-				rotationSpeed: Math.PI*0.01, rotation:0.0
+				movementSpeed: 30.0, movement:0.0, 
+				rotationSpeed: Math.PI*0.005, rotation:0.0
 };
 //holds details about height, move speed of player
 
-
+/***
+@return returns something
+***/
 initScene=function() {
 	
 	renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -122,13 +122,19 @@ initScene=function() {
 	document.getElementById( 'viewport' ).appendChild(renderer.domElement);
 	
 	render_stats = new Stats();
+		render_stats.domElement.style.position = 'absolute';
+		render_stats.domElement.style.top = '0px';
+		render_stats.domElement.style.zIndex = 100;
 	document.getElementById( 'viewport' ).appendChild( render_stats.domElement );
 	
 	physics_stats = new Stats();
+		physics_stats.domElement.style.position = 'absolute';
+		physics_stats.domElement.style.top = '50px';
+		physics_stats.domElement.style.zIndex = 100;
 	document.getElementById( 'viewport' ).appendChild( physics_stats.domElement );
 
-	scene = new Physijs.Scene({fixedTimeStep: 1 / 60 });
-	scene.setGravity(new THREE.Vector3( 0, -30, 0 ));
+	scene = new Physijs.Scene;
+	scene.setGravity(new THREE.Vector3( 0, -10, 0 ));
 	scene.addEventListener(
 		'update',
 		function() {
@@ -151,11 +157,12 @@ initScene=function() {
 			0 // mass
 		);
 		ground.receiveShadow = true;
+		ground.name='ground';
 		scene.add( ground );
 	
 	
 	
-	ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+	ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
 	scene.add(ambientLight);
 	
 	pointlight = new THREE.PointLight(0xffffff, 1.0);
@@ -169,8 +176,9 @@ initScene=function() {
 	
 	addObjects();	
 	
-	requestAnimationFrame(render);
 	scene.simulate();
+	requestAnimationFrame(render);
+	
 }
 	
 	//definition: addObject
@@ -184,13 +192,24 @@ initScene=function() {
 		);		
 		
 		spirit.setAngularFactor(new THREE.Vector3(0, 0, 0));
-		spirit.position.y += 1.0;
+		spirit.position.y += 2.0;
 		spirit.receiveShadow = true; //meshes - object both receive
 		spirit.castShadow = true; // and cast shadows
-		spirit.setCcdMotionThreshold(1);
-		spirit.addEventListener( 'collision', handleCollision);
-		scene.add(spirit);
+		//spirit.setCcdMotionThreshold(1);
+		spirit.setCcdSweptSphereRadius(1);
+		spirit.addEventListener('ready',function(){
+			spirit.addEventListener('collision',handleCollision);
+		});	
 		
+		//don't delete/activate this thank you :)
+		/*var constraint = new Physijs.PointConstraint(
+			spirit, // First object to be constrained
+			new THREE.Vector3( 0, 10, 0 ) // point in the scene to apply the constraint
+		);
+		scene.addConstraint( constraint );*/
+		
+		
+		scene.add(spirit);			
 		
 		//place trees and mushrooms on the map
 		for (var i = 0; i < numObject; i++) {
@@ -218,16 +237,18 @@ initScene=function() {
 				mushroomCap = new Physijs.ConeMesh(
 				mushroomCapGeometry, 
 				mushroomcapMaterial,
-				1000
+				1
 				);
 				mushroomCap.position.set (0,
 				0.25,
 				0);
 				
 				mushroom.add(mushroomCap);
-				mushroom.receiveShadow = true;
-				mushroom.castShadow = true;	
 				
+				mushroom.receiveShadow = true;
+				mushroom.castShadow = true;
+				
+				mushroom.name='mushroom'+i/10;
 				scene.add(mushroom);				
 			}
 			else{
@@ -254,6 +275,8 @@ initScene=function() {
 				
 				tree.receiveShadow = true;
 				tree.castShadow = true;
+				
+				tree.name='tree'+i;
 				scene.add(tree);
 			}
 			
@@ -275,15 +298,10 @@ initScene=function() {
 
 render = function() {
 		requestAnimationFrame( render );
-		
-		/*spirit.__dirtyPosition = true;
-		spirit.__dirtyRotation = true;
-		spirit.setLinearVelocity(new THREE.Vector3(0, 0, 0));
-		spirit.setAngularVelocity(new THREE.Vector3(0, 0, 0));*/
-		keysInterpreter();
-		
+				
+		keysInterpreter();//interprets user input
 		applyMovement();
-		
+				
 		renderer.render( scene, camera );
 		render_stats.update();
 };
@@ -323,7 +341,7 @@ render = function() {
 				)
 			);
 		
-		spirit.setAngularVelocity(new THREE.Vector3(0,0,0)); //prevent the player character from spinning
+		spirit.setAngularFactor(new THREE.Vector3(0,0,0)); //prevent the player character from spinning
 		
 			//follow the players movement form 3rd or first person
 		if(cam3){
@@ -368,8 +386,8 @@ keyUp=function(event){
 	}
 }
 
-handleCollision=function( collided_with, linearVelocity, angularVelocity ){
-	console.log("collided!");
+handleCollision=function( collided_with){
+	console.log('collided with '+collided_with.name+'\n');
 };
 
 window.addEventListener('keydown', keyDown);
