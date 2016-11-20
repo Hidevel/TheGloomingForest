@@ -60,12 +60,7 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 	movement speed, current speed, 
 	rotation speed and current rotation 
 	of the player respectively*/
-	var player = {height: 2.0, 
-					movementSpeed: 30.0, 
-					movement:0.0, 
-					rotationSpeed: Math.PI*0.005, 
-					rotation:0.0
-	};
+	var player;
 
 
 /***
@@ -106,7 +101,7 @@ initScene=function() {
 	);	
 	
 	camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-		cameraDistanceToPlayer3rdPerson=6;
+		cameraDistanceToPlayer3rdPerson=8;
 		cameraLookAt3rdPerson=4;
 		cameraDistanceFromPlayerYCoord=4;
 		cameraLookAt1stPerson=5;
@@ -160,7 +155,7 @@ initScene=function() {
 			trunkGeometry=new THREE.CylinderGeometry(0.75, treeTrunkBottom, 6);
 			
 			trunkMaterial = Physijs.createMaterial(
-					new THREE.MeshPhongMaterial(
+					new THREE.MeshLambertMaterial(
 					{color:0x60351c}),
 					1.0, //friction
 					0.3 //restitution
