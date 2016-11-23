@@ -5,19 +5,29 @@
 		<title>The Glooming Forest</title>
 		
 		<meta charset="utf-8"/>
+		
 		<script type="text/javascript" src="./scripts/three.min.js" ></script>
 		<script type="text/javascript" src="./scripts/stats.js"></script>
-		<script type="text/javascript" src="./scripts/ammo.js"></script>
+		<script async type="text/javascript" src="./scripts/ammo.js"></script>
 		<script type="text/javascript" src="./scripts/physi.js"></script>
 		
 		<script type="text/javascript" src="./scripts/gloomingForest.js" ></script>
 	
 	</head>
+	<style>
+	*{
+	margin:0;
+	padding:0;
+	}
+	</style>
+	
+	<div id='d1' style="position:absolute; top:0; left:0; z-index:110">  
+      <canvas id='canvas' width='600' height='600'>
+            Your browser does not support HTML5 Canvas.
+      </canvas>
+	</div>
 	
 	<body>
 		<div id="viewport"></div>
 	</body>
-	
-
-
 </html>
