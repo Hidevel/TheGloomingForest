@@ -4,28 +4,29 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 
 //VARIABLES
 	//functions
-	var initScene, render, addObjects, 
+	var initScene, render, createObjects, addObjects, 
+	restart, showCanvas,
 	treeCoordGenerator, mushroomPlacer,
-	keysInterpreter, applyMovement, 
-	startNewGame, restart, rearrangeObjects;
+	keysInterpreter, applyMovement;
 	
 	//event handler functions
 	var keyUp,keyDown,handleCollision;	
 	
 	//scene basics variables
 	var scene, renderer, render_stats, physics_stats, textureLoader, 
-		ambientLight, 
-		pointlightSpiritUp, 
-		pointlightSpiritDown,
-		pointlightSpiritFront,
-		pointlightSpiritBack,
-		pointlightSpiritLeft,
-		pointlightSpiritRight,
-		camera, 
+		ambientLight,
+		hemiSphereLight,
+		pointlightSpirit,
+		pointLightSpiritBack,
+		pointLightSpiritUp,
+		camera,
 		cameraDistanceToPlayer3rdPerson,
 		cameraLookAt3rdPerson,
 		cameraDistanceFromPlayerYCoord,
-		cameraLookAt1stPerson;
+		cameraLookAt1stPerson,
+		isScenePaused,
+		surroundColor,
+		groundColor;
 	
 		//size variables
 		var mapSize;//size of the map
@@ -40,32 +41,33 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 			randomGeneratorDynamic,
 			treesArray, 
 			mushroomsArray,
-			chosenTree,
-			alreadyUsedTrees;
+			zeroVector;
 		
-		//geometry, material and mesh variables
-		var ground, groundGeometry, groundMaterial, //ground
+		//gometry, material and mesh variables
+		var skyDome,skyDomeGeometry,skyDomeMaterial,//sky
+			ground, groundGeometry, groundMaterial, //ground
+			gameOver,gameOverGeometry, gameOverMaterial,
 			tree, trunkGeometry, trunkMaterial, //tree
 			branches, branchGeometry, branchMaterial, //tree
 			mushroom, mushroomTrunkGeometry, mushroomTrunkMaterial,//mushroom
 			mushroomCap, mushroomCapGeometry, mushroomcapMaterial, //mushroomCap
-			spirit, spiritGeometry, spiritMaterial; //spirit/player
-		
+			spirit, spiritGeometry, spiritMaterial, //spirit/player
+			canvas1, canvas2, ctx2, firstTime; //start new game, game over
+
 	//player related variables
+	zeroVector= new THREE.Vector3(0,0,0);
+	
 	var keyboard = {};
 	
-	var brightness, lightIntensity, lightDistance;
+	var transparency;
 	
 	var cam3; //camera is set in third person view or first person view
 
-	var transparency;
-	
 	/*holds details about height, 
 	movement speed, current speed, 
 	rotation speed and current rotation 
 	of the player respectively*/
 	var player;
-	var noSpinning;
 
 
 /***
@@ -74,7 +76,7 @@ Nice, long descriptions can be written this way
 initScene=function() {
 	
 	renderer = new THREE.WebGLRenderer({ antialias: true });
-	renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.setSize(window.innerWidth-10, window.innerHeight-10);
 	
 	//enable shadows
 	renderer.shadowMap.enabled = true;
@@ -100,80 +102,109 @@ initScene=function() {
 	scene.addEventListener(
 		'update',
 		function() {
-		scene.simulate( undefined, 2 );
+		scene.simulate( undefined,2 );
 		physics_stats.update();
 		}
-	);	
+	);
 	
-	camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-	cameraDistanceToPlayer3rdPerson=10;
-	cameraLookAt3rdPerson=4;
-	cameraDistanceFromPlayerYCoord=4;
-	cameraLookAt1stPerson=5;
-	scene.add(camera);
-	
-	
+		canvas1 = renderer.domElement;
+		canvas2 = document.getElementById("canvas");
+		canvas2.width = window.innerWidth - 10;
+		canvas2.height = window.innerHeight-10;
+		ctx2 = canvas2.getContext("2d");
+		firstTime = 1;
+		
 		//used global variables defined
 		
 		mapSize = 100;//size of the map
 		
-		numTrees = 200; //number of trees on the map
+		numTrees = 100; //number of trees on the map
 		numMushrooms = 10; //number of mushrooms on the map
 		treesArray=new Array(numTrees);
 		mushroomsArray=new Array(numMushrooms);
 		//player related variables
-		noSpinning = new THREE.Vector3(0,0,0)
-		chosenTree,alreadyUsedTrees=new Array(numMushrooms);
 		
 		cam3 = true; //camera is set in third person view
-		
-		transparency = 1;
-		
+		transparency=1;
 		player = {height: 2.0, 
 				movementSpeed: 10.0, movement:0.0, 
-				rotationSpeed: Math.PI*0.008, rotation:0.0
-		};
+				rotationSpeed: Math.PI*0.008, rotation:0.0,
+				sight:20
+		};		
 		
-		//array of used coordinates
-		randomTreeCoordinates = new Array(2);//we will store x and y coordiantes
-			for(var i = 0; i < 2; i++){
-				randomTreeCoordinates[i] = new Array(numTrees); //coordinates for every object
-		}
-				
+		camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1200);
+		cameraDistanceToPlayer3rdPerson=8;
+		cameraLookAt3rdPerson=4;
+		cameraDistanceFromPlayerYCoord=3;
+		cameraLookAt1stPerson=8;
+		
+		scene.add(camera);
+		
+		//colours
+		groundColor=0x30113a; //colour of groundMaterial and hemiSphereLight's ground property
+		surroundColor=0x3a1b2c;
+		
+		//scene lights
+		hemiSphereLight= new THREE.HemisphereLight(0x000000,groundColor, 0.08);
+		scene.add(hemiSphereLight);
+		
+		ambientLight = new THREE.AmbientLight(0xfffbea, 0.4);//4d004d
+		scene.add(ambientLight);
+		
+		scene.fog=new THREE.FogExp2(surroundColor,0.06);
+
 		//mushroomPlacer support variables
 		treeTrunkBottom=1;
 		mushroomTreeDistance=1;
-	
+		
 		//treeCoordGenerator support variables
 		randomGeneratorStatic=(mapSize/2)-treeTrunkBottom-mushroomTreeDistance;
 		randomGeneratorDynamic=randomGeneratorStatic*2;
 	
 	textureLoader = new THREE.TextureLoader();
 			//geometry and material definitions
+				//sky
+				skyDomeGeometry = new THREE.SphereGeometry(512, 16, 16, 0, Math.PI*2, 0, Math.PI*0.5),
+				
+				skyDomeMaterial= Physijs.createMaterial(
+					new THREE.MeshLambertMaterial({ color:surroundColor,side: THREE.BackSide, fog: true}),
+					1.0, // high friction
+					0.0 // low restitution
+				);
+				
 				//ground
 			groundGeometry = new THREE.BoxGeometry(mapSize, 0, mapSize);
 			
 			groundMaterial = Physijs.createMaterial(
-				new THREE.MeshLambertMaterial({ color:0xffffff }),
+				new THREE.MeshLambertMaterial({ color:groundColor}),
 				0.8, // high friction
 				0.3 // low restitution
 			);
-				
+			
+				//gameOver
+			gameOverGeometry= new THREE.BoxGeometry(512, 0, 512);
+			
+			gameOverMaterial= Physijs.createMaterial(
+				new THREE.MeshLambertMaterial({ color:surroundColor }),
+				1.0, // high friction
+				0.0 // low restitution
+			);
 				//tree
-			trunkGeometry=new THREE.CylinderGeometry(treeTrunkBottom - treeTrunkBottom/4, treeTrunkBottom, 6);
+			trunkGeometry=new THREE.CylinderGeometry(0.75, treeTrunkBottom, 6,10,10);
 			
 			trunkMaterial = Physijs.createMaterial(
 					new THREE.MeshLambertMaterial(
-					{color:0x60351c}),
+					{color:0x2e213f}),
 					1.0, //friction
 					0.3 //restitution
 			);
 			
-			branchGeometry=new THREE.SphereGeometry(4);
+			branchGeometry=new THREE.SphereGeometry(4,16,16);
 			
 			branchMaterial = Physijs.createMaterial(
-						new THREE.MeshLambertMaterial(
-						{color:0x1c601e}),
+						new THREE.MeshPhongMaterial(
+						{color:0xf4edff,
+						shininess:100}),
 						1.0, //friction
 						0.3 //restitution
 			);
@@ -183,7 +214,7 @@ initScene=function() {
 			
 			mushroomTrunkMaterial = Physijs.createMaterial(
 						new THREE.MeshPhongMaterial(
-						{color:0xfff6e2}),
+						{color:0xffd6fa}),
 						0.1, //friction
 						0.8 //restitution
 			); 
@@ -192,7 +223,8 @@ initScene=function() {
 			
 			mushroomcapMaterial = Physijs.createMaterial(
 						new THREE.MeshPhongMaterial(
-						{color:0xf9e2ff}),
+						{color:0x5e0404,
+						shininess:10}),
 						0.1, //friction
 						0.8 //restitution
 			);
@@ -201,15 +233,23 @@ initScene=function() {
 			
 			spiritMaterial = Physijs.createMaterial(
 					new THREE.MeshPhongMaterial(
-					{ color:0x33ff66,
-					specular:0xf4b642,
-					transparent: true,
-					opacity:1,
-					shininess:100					
+					{color:0xfeffe0,
+					transparent:true,
+					opacity:1.0,
+					shininess:100
 					}),
 					0.5, //friction
 					0.0 //restitution
 			);
+	//skyDome - represents the sky
+	skyDome = new THREE.Mesh(
+		skyDomeGeometry,
+		skyDomeMaterial,
+		0
+    );
+    skyDome.position.y = -256;
+    scene.add(skyDome);
+			
 	
 	// Ground
 		ground = new Physijs.BoxMesh(
@@ -221,22 +261,29 @@ initScene=function() {
 		ground.name='ground';
 		scene.add( ground );
 	
-	ambientLight = new THREE.HemisphereLight(0x053327, 0x287260,0.2);
-	scene.add(ambientLight);
+	//the game over platform (if the player collides with this the game ends)
+	gameOver = new Physijs.BoxMesh(
+			gameOverGeometry,
+			gameOverMaterial,
+			0 // mass
+		);
+		gameOver.position.set(0,-4,0);
+		gameOver.name='gameOver';
+		scene.add( gameOver );
+	
+	//create the objects (trees,mushrooms,player character)
+	createObjects();
+	
+	//add the objects to the scene
+	isScenePaused = false;
 	addObjects();	
-	startNewGame();
-}
-
-//definition: startNewGame
-startNewGame = function(){
-	rearrangeObjects();
 	scene.simulate();
 	requestAnimationFrame(render);
 	
-};
+}
 	
-	//definition: addObjects
-	addObjects=function(){
+	//definition: addObject
+	createObjects=function(){
 		
 		//create the player, the spirit
 		spirit = new Physijs.CylinderMesh(
@@ -246,19 +293,13 @@ startNewGame = function(){
 		);		
 		
 		spirit.receiveShadow = true; //meshes - object both receive
-		spirit.castShadow = true; // and cast shadows
+		spirit.castShadow = false; // and cast shadows
 		spirit.setCcdMotionThreshold(1);
 		spirit.setCcdSweptSphereRadius(1);
 		spirit.addEventListener('ready',function(){
-		spirit.addEventListener('collision',handleCollision);
+			spirit.addEventListener('collision',handleCollision);
 		});	
-		
-		//don't delete/activate this thank you :)
-		/*var constraint = new Physijs.PointConstraint(
-			spirit, // First object to be constrained
-			new THREE.Vector3( 0, 10, 0 ) // point in the scene to apply the constraint
-		);
-		scene.addConstraint( constraint );*/
+		spirit.name='spirit';
 		
 		//adds lighting to the spirit
 		/*
@@ -269,27 +310,38 @@ startNewGame = function(){
 			- intensity: 0.2 0.25 0.3 0.35 0.4
 			- distance: 5 10 15 20 25
 		*/
-		pointlightSpiritUp		= 	new THREE.PointLight(0xeeeeff, 0.4, 22,1);
-		pointlightSpiritDown	= 	new THREE.PointLight(0xeeeeff, 0.4, 28,1);
-		pointlightSpiritFront	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1);
-		pointlightSpiritBack	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1);
-		pointlightSpiritLeft	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1);
-		pointlightSpiritRight	= 	new THREE.PointLight(0xeeeeff, 0.4, 25,1); //PointLight( color, intensity, distance, decay )
+		pointlightSpirit=new THREE.PointLight(0xffcccc, 1, player.sight,2);
 		
-		pointlightSpiritUp.position.set(0, player.height+2, 0);
-		pointlightSpiritDown.position.set(0, player.height/20, 0);
-		pointlightSpiritFront.position.set(0, player.height/2, 3);
-		pointlightSpiritBack.position.set(0, player.height/2, -3);
-		pointlightSpiritLeft.position.set(-3, player.height/2, 0);
-		pointlightSpiritRight.position.set(3, player.height/2, 0);
-	
-		spirit.add(pointlightSpiritUp);
-		spirit.add(pointlightSpiritDown);
-		spirit.add(pointlightSpiritFront);
-		spirit.add(pointlightSpiritBack);
-		spirit.add(pointlightSpiritLeft);
-		spirit.add(pointlightSpiritRight);
-					
+		pointlightSpirit.position.set(0, player.height/2, 0);
+		
+		pointlightSpirit.castShadow=true;
+		pointlightSpirit.shadow.camera.near = 1;
+		pointlightSpirit.shadow.camera.far = player.sight;
+		pointlightSpirit.shadow.bias = 0.01;
+		
+		spirit.add(pointlightSpirit);
+			
+			//lit's the spirits from above
+			pointLightSpiritUp=new THREE.PointLight(0xffdddd, 1,2,1);
+			
+			pointLightSpiritUp.position.set(0,player.height+0.5,0);
+			
+			pointLightSpiritUp.shadow.camera.near = 1;
+			pointLightSpiritUp.shadow.camera.far = player.sight;
+			pointLightSpiritUp.shadow.bias = 0.01;		
+			
+			spirit.add(pointLightSpiritUp);
+			
+			
+			//lit's the spirits back
+			pointLightSpiritBack=new THREE.PointLight(0xffdddd, 1,5,2);
+			
+			pointLightSpiritBack.shadow.camera.near = 1;
+			pointLightSpiritBack.shadow.camera.far = player.sight;
+			pointLightSpiritBack.shadow.bias = 0.01;		
+			
+			spirit.add(pointLightSpiritBack);
+		
 		
 		//place trees and mushrooms on the map
 		for (var i = 0; i < numTrees; i++) {
@@ -299,12 +351,7 @@ startNewGame = function(){
 				trunkMaterial,
 				0
 			);
-			
-			tree.position.set (i/10 - mapSize/2,
-								3,
-								i/10 - mapSize/2
-			);
-			
+				
 			branches = new Physijs.SphereMesh(
 				branchGeometry, 
 				branchMaterial,
@@ -321,51 +368,54 @@ startNewGame = function(){
 			tree.name='tree'+i;
 			treesArray[i]=tree;
 		}
+
 		
-		//create mushrooms
-		for(var i=0;i<numMushrooms;i++){
-			//create mushroom trunk
-			mushroom = new Physijs.CylinderMesh(
-				mushroomTrunkGeometry,
-				mushroomTrunkMaterial,
-				0
-			);
-			
-			mushroom.position.set (i/6 - mapSize/2,
-								0.125,
-								i/6 - mapSize/2
-			);
-			
-		//create mushroom cap
-		mushroomCap = new Physijs.ConeMesh(
-			mushroomCapGeometry, 
-			mushroomcapMaterial,
-			1
-		);
-			//cap above trunk
-		mushroomCap.position.set (0,0.25,0);
-			
-			//combine cap, with trunk
-		mushroom.add(mushroomCap);
-			
-		mushroom.receiveShadow = true;
-		mushroom.castShadow = true;
-			
-		mushroom.name='mushroom'+i;
-		mushroom.touchEffect=""; //what happens when the player touches the mushroom
-		
-		mushroomsArray[i]=mushroom;//store the mushrooms in the mushroom array
-		}
-	};
+		for(var i=0;i<numMushrooms;i++){				
+					//create mushroom trunk
+				mushroom = new Physijs.CylinderMesh(
+					mushroomTrunkGeometry,
+					mushroomTrunkMaterial,
+					0
+				);
+					
+					//create mushroom cap
+				mushroomCap = new Physijs.ConeMesh(
+					mushroomCapGeometry, 
+					mushroomcapMaterial,
+					1
+				);
+					//cap above trunk
+				mushroomCap.position.set (0,0.25,0);
+					
+					//combine cap, with trunk
+				mushroom.add(mushroomCap);
+					
+				mushroom.receiveShadow = true;
+				mushroom.castShadow = true;
+					
+				mushroom.name='mushroom'+i;
+				mushroom.touchEffect=""; //what happens when the player touches the mushroom
+				
+				mushroomsArray[i]=mushroom;//store the mushrooms in the mushroom array
+		}					
+	}
 	
-	//definition: rearrangeObjects
-	rearrangeObjects = function() {
-		spirit.setAngularFactor(noSpinning);
-		spirit.position.set(0, player.height/2 + 0.1, 0);
+		//definition: addObjects
+	addObjects=function(){
+		isScenePaused = true;
+		spirit.position.set(0,2,0);
 		scene.add(spirit);
 		
-		//place trees and mushrooms on the map
+		
+		//array of used coordinates
+		var randomTreeCoordinates = new Array(2);//we will store x and y coordiantes
+			for(var i = 0; i < 2; i++){
+				randomTreeCoordinates[i] = new Array(numTrees); //coordinates for every object
+		}
+		//add trees to the scene
 		for (var i = 0; i < numTrees; i++) {
+		
+			tree=treesArray[i];
 			
 			randomTreeCoordinates[0][i]=treeCoordGenerator(randomTreeCoordinates[0]);		
 			randomTreeCoordinates[1][i]=treeCoordGenerator(randomTreeCoordinates[1]);
@@ -374,19 +424,30 @@ startNewGame = function(){
 			if (Math.abs(randomTreeCoordinates[0][i]) < 2.0) randomTreeCoordinates[0][i] += 4.0;
 			if (Math.abs(randomTreeCoordinates[1][i]) < 2.0) randomTreeCoordinates[1][i] += 4.0;
 			
-			treesArray[i].position.set (randomTreeCoordinates[0][i],
-								3,
-								randomTreeCoordinates[1][i]
+			tree.position.set (randomTreeCoordinates[0][i],
+						3,
+						randomTreeCoordinates[1][i]
 			);
-			scene.add(treesArray[i]);
 			
+			scene.add(tree);
 		}
-		//place a mushroom near trees
+		
+		
+		//place mushrooms near trees
 		mushroomPlacer(treesArray,numTrees,numMushrooms);
-	};
+		
+		isScenePaused = true;
+		if (firstTime == 1) {
+			showCanvas('start');
+			firstTime = 0;
+		} else {
+			showCanvas('startOver');
+		}
+	}
 		
 		//generataes a random coordinate
 		treeCoordGenerator = function (storedCoordiantes){
+			
 			var newCoordinate = Math.floor(
 			randomGeneratorStatic - randomGeneratorDynamic * Math.random()
 			);
@@ -405,58 +466,63 @@ startNewGame = function(){
 				}else{
 					newCoordinate-=Math.floor(Math.random()+1);
 				}
-			}
-			
+			}	
 			
 			return newCoordinate;
 		};
 		
-		//places numOfMushrooms mushrooms near randomly chosen trees
+		//places numOfMushrooms mushrooms near randomly chosen trees and add mushrooms to the scene
 		mushroomPlacer=function (treeArray,treeArrayLength,numOfMushrooms){
 			
-			for(var i=0;i<numOfMushrooms;i++){
-				scene.remove(mushroomsArray[i]);
+			var chosenTree,alreadyUsedTrees=new Array(numMushrooms);
+		
+			for(var i=0;i<numMushrooms;i++){
+			
 				//select a tree from the treeArray
 				do{
-					chosenTree=treeArray[Math.floor(Math.random() * treeArrayLength)];
+					chosenTree=treesArray[Math.floor(Math.random() * numTrees)];
 					
 				}while(alreadyUsedTrees.includes(chosenTree));
 				
-				alreadyUsedTrees[i]=(chosenTree); //add the chosen tree to the used ones
-					
-					//variety of mushrooms placements through the number of the current mushroom
+				alreadyUsedTrees[i]=chosenTree; //add the chosen tree to the used ones
+			
+			
+				mushroom=mushroomsArray[i];
+			
+				//variety of mushrooms placements through the number of the current mushroom
 					//place the mushrooms near the trees
 				var mushroomDirection=i % 4;
 				if(mushroomDirection === 0){//place the mushroom north-east from tree
-					mushroomsArray[i].position.set (
+					mushroom.position.set (
 						chosenTree.position.x+treeTrunkBottom+mushroomTreeDistance,
 						0.25,
 						chosenTree.position.z+treeTrunkBottom+mushroomTreeDistance
 					);
 				}else if(mushroomDirection === 1){//place the mushroom north-west from tree
-					mushroomsArray[i].position.set (
+					mushroom.position.set (
 						chosenTree.position.x-treeTrunkBottom-mushroomTreeDistance,
 						0.25,
 						chosenTree.position.z+treeTrunkBottom+mushroomTreeDistance
 					);
 				}else if(mushroomDirection === 2){//place the mushroom south-east from tree
-					mushroomsArray[i].position.set (
+					mushroom.position.set (
 						chosenTree.position.x+treeTrunkBottom+mushroomTreeDistance,
 						0.25,
 						chosenTree.position.z-treeTrunkBottom-mushroomTreeDistance
 					);
 				}else if(mushroomDirection === 3){//place the mushroom south-west from tree
-					mushroomsArray[i].position.set (
+					mushroom.position.set (
 						chosenTree.position.x-treeTrunkBottom-mushroomTreeDistance,
 						0.25,
 						chosenTree.position.z-treeTrunkBottom-mushroomTreeDistance
 					);
 				}
-				scene.add(mushroom);
 				
+				scene.add(mushroom);
 			}
-		}
-
+		};
+	
+	
 //RENDERER
 
 render = function() {
@@ -465,6 +531,7 @@ render = function() {
 		keysInterpreter();//interprets user input
 		applyMovement();
 			
+		spirit.material.opacity = transparency;			
 		renderer.render( scene, camera );
 		render_stats.update();
 };
@@ -483,36 +550,18 @@ render = function() {
 			//movement
 		if (keyboard[38]){ // up arrow key	
 			player.movement=player.movementSpeed;
-			if (Math.abs(spirit.position.x) >= Math.abs(mapSize/2 + 0.5) 
-				|| Math.abs(spirit.position.z) >= Math.abs(mapSize/2 + 0.5) ){		
-				restart();
-			}
 		}
 		if (keyboard[40]){ // down arrow key
 			player.movement=-player.movementSpeed;
-			if (Math.abs(spirit.position.x) >= Math.abs(mapSize/2 + 0.5) 
-				|| Math.abs(spirit.position.z) >= Math.abs(mapSize/2 + 0.5) ){
-				restart();
-			}
 		}
 			//no movementKey pressed
 		if(!keyboard[38] && !keyboard[40]){
 			player.movement=0.0;
 		}
 		transparency -= 0.001;
-		if (transparency <= 0.0) restart();
-		else spirit.material.opacity = transparency;
-	}
-	
-	restart = function(){
-		//fade out
-		transparency = 1;
-		spiritMaterial.opacity = transparency;
-		for (var j = 0; j < numTrees; j++) {
-			scene.remove(treesArray[j]);
+		if (transparency <= 0.0) {
+			restart();
 		}
-		scene.remove(spirit);
-		startNewGame();
 	}
 	
 	applyMovement=function(){
@@ -526,7 +575,14 @@ render = function() {
 				)
 			);
 		
-		spirit.setAngularFactor(noSpinning); //prevent the player character from spinning
+		spirit.setAngularFactor(zeroVector); //prevent the player character from spinning
+		
+		//back light of the spirit
+			pointLightSpiritBack.position.set( - (Math.sin(player.rotation)*3),
+				player.height/2,
+				 - (Math.cos(player.rotation)*3)
+			);
+		
 		
 			//follow the players movement form 3rd or first person
 		if(cam3){
@@ -544,6 +600,7 @@ render = function() {
 				spirit.position.z + Math.cos(player.rotation)*cameraLookAt3rdPerson
 				)
 			);
+			
 		}
 		else{
 			camera.position.set(spirit.position.x,
@@ -553,43 +610,105 @@ render = function() {
 			camera.lookAt(
 			new THREE.Vector3(
 				spirit.position.x + Math.sin(player.rotation)*cameraLookAt1stPerson,
-				1,
+				0,
 				spirit.position.z + Math.cos(player.rotation)*cameraLookAt1stPerson
 				)
 			);
 		}
+			
+			
 	}
 		
 //EVENT HANDLER FUNCTIONS
 
 keyDown=function(event){
-	keyboard[event.keyCode] = true;
+	
+	if(!isScenePaused){
+		keyboard[event.keyCode] = true;
+	} 
+	else if (isScenePaused) {
+		if (canvas2.style.visibility == 'visible') {
+		canvas2.style.visibility='hidden';
+		isScenePaused=false; 
+		}
+	}
 }
 keyUp=function(event){
-	keyboard[event.keyCode] = false;
-	
-	// C key
-	if (event.keyCode === 67) {
-		if (cam3) {
-			cam3 = false;
-		}
-		else{
-			cam3 = true;
+	if(!isScenePaused){
+		keyboard[event.keyCode] = false;
+		
+		// C key
+		if (event.keyCode === 67) {
+			if (cam3) {
+				cam3 = false;
+			}
+			else{
+				cam3 = true;
+			}
 		}
 	}
 }
 
-handleCollision=function(collided_with){
-	console.log(collided_with.name);
-	if(collided_with.name.includes("mushroom")){
-		transparency += 0.02;
-		if (transparency > 1.0) transparency = 1.0;
-		spirit.material.opacity = transparency;
-		mushroomPlacer(treesArray,numTrees,numMushrooms);
+restart = function(){
+	isScenePaused = true;
+	scene.remove(spirit);
+	transparency = 1;
+	keyboard={}
+	for(var i=0;i<numMushrooms;i++){
+		scene.remove(mushroomsArray[i]);
 	}
+	for(var i=0;i<numTrees;i++){
+		scene.remove(treesArray[i]);
+	}
+	addObjects();
+};
+
+handleCollision=function(collided_with){
+	
+	if(collided_with.name.includes("gameOver")){
+		restart();
+	}
+	
+	if(collided_with.name.includes("mushroom")){
+		for(var i=0;i<numMushrooms;i++){
+			scene.remove(mushroomsArray[i]);
+		}
+		mushroomPlacer(treesArray,numTrees,numMushrooms);
+		
+		transparency += 0.1;
+		if (transparency > 1.0) transparency = 1.0;
+	}
+};
+
+showCanvas = function(action) { 
+	isScenePaused = true;
+	ctx2.clearRect(0, 0, canvas.width, canvas.height);
+	ctx2.fillStyle = "rgba(0, 0, 0, 0.5)";
+	ctx2.fillRect(0,0,canvas2.width,canvas2.height);
+	ctx2.fillStyle = "#FFFFFF";
+	ctx2.font = "30px Georgia";
+	if (action == 'start') {
+		ctx2.fillText("Press any key to start the game", canvas2.width/2 - 200, canvas2.height/2);
+	} else if (action == 'startOver') {
+		ctx2.fillText("GAME OVER", canvas2.width/2 - 100, canvas2.height/2 - 40);
+		ctx2.fillText("Press any key to restart", canvas2.width/2 - 150, canvas2.height/2 + 30);
+	}
+	canvas2.style.visibility='visible';
 };
 
 window.addEventListener('keydown', keyDown);
 window.addEventListener('keyup', keyUp);
 
+	//stop character moving if the user leaves the browser tab
+window.addEventListener('blur',function(){
+		//stop rotation
+		keyboard[37]=false;
+		keyboard[39]=false;
+		
+		//stop movement
+		keyboard[38]=false;
+		keyboard[40]=false;
+})
+
+	//initializes the whole scene
 window.onload = initScene;
