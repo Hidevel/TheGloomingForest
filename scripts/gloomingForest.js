@@ -573,35 +573,38 @@ initScene=function() {
 //RENDERER
 
 render = function() {
-	if(isFocused && !isScenePaused){
+	if(!isScenePaused){
 		requestAnimationFrame( render );
 				
 		keysInterpreter();//interprets user input
 	
-	//effect updates
-		//update the transparency of the player character
-		spirit.material.opacity = transparency;
 		
-		//update the pointlights' intesity
-		pointlightSpirit.intensity=
-		pointLightSpiritBack.intensity=
-		pointLightSpiritUp.intensity=transparency;
-		
-		//update the fog and ambient light intensity
-		ambientLight.intensity=baseAmbientLightIntensity*transparency; 
-		scene.fog.density=baseFogDensity*(1-(transparency-1));
+		//effect updates if Focused
+		if(isFocused){
+			//update the transparency of the player character
+			spirit.material.opacity = transparency;
 			
+			//update the pointlights' intesity
+			pointlightSpirit.intensity=
+			pointLightSpiritBack.intensity=
+			pointLightSpiritUp.intensity=transparency;
+			
+			//update the fog and ambient light intensity
+			ambientLight.intensity=baseAmbientLightIntensity*transparency; 
+			scene.fog.density=baseFogDensity*(1-(transparency-1));
+				
 			//decreaseTransparency
 			transparency-=0.00025*transparencyDecreaseRate;
-				
+					
 			//update the brightness bar
 			brightnessBar.style.width=(baseBrightnessBarLength*transparency)+"vw";
-				
+					
 			//game over if the player disappears
 			if(transparency <= 0){
 				fell=false;
 				restart();
 			}
+		}		
 	}	
 	
 	applyMovement();//move the player character and the camera
@@ -850,7 +853,7 @@ showUI = function(action) {
 		
 			//display additional info
 		uiDisplay = document.getElementById("uiTextInfo");
-		uiDisplay.textContent="Your score is "+points+" points.";
+		uiDisplay.textContent="Your final score is "+points+" points.";
 		
 			//display even more info
 		uiDisplay = document.getElementById("uiTextInfo2");
@@ -862,7 +865,7 @@ showUI = function(action) {
 		
 			//display additional info
 		uiDisplay = document.getElementById("uiTextInfo");
-		uiDisplay.textContent="Your score is "+points+" points.";
+		uiDisplay.textContent="Your final score is "+points+" points.";
 		
 			//display even more info
 		uiDisplay = document.getElementById("uiTextInfo2");
@@ -893,7 +896,7 @@ window.addEventListener('keyup', keyUp);
 	//if the user leaves the browser tab
 window.addEventListener('blur',function(){
 		
-	//opacity
+	//opacity decrease stop
 	isFocused=false;
 	
 	//stop rotation
@@ -908,7 +911,7 @@ window.addEventListener('blur',function(){
 
 window.addEventListener('focus',function(){
 	//only set opacity if the UI isn't visible
-		isFocused=true;		
+		isFocused=true;
 });
 
 	//initializes the whole scene
