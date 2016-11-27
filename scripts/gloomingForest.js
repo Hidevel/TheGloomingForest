@@ -17,7 +17,8 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 	showUI,
 	windowResizer,
 	decreaseTransparency,
-	pointParser;
+	pointParser,
+	setCookie,getCookie;//highscore storing
 	
 	//event handler functions
 	var keyUp,keyDown,handleCollision;	
@@ -58,8 +59,8 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 		
 		//UI variables
 		uiDisplay,
-		brightnessBar
-		,fell; //fell determines the 'game over reason'
+		brightnessBar,
+		fell; //fell determines the 'game over reason'
 	
 		//size variables
 		var mapSize;//size of the map
@@ -76,7 +77,7 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 			mushroomsArray,
 			zeroVector;
 		
-		//gometry, material and mesh variables
+		//geometry, material and mesh variables
 		var skyDome,skyDomeGeometry,skyDomeMaterial,//sky
 			ground, groundGeometry, groundMaterial, //ground
 			gameOver,gameOverGeometry, gameOverMaterial,
@@ -94,7 +95,7 @@ Physijs.scripts.worker = 'scripts/physijs_worker.js';
 	
 	var transparency, //how transparent the player is
 		transparencyDecreaseRate, //how fast the transparency decrease is
-		points, //how many point the player gathered altogether
+		points,//how many point the player gathered altogether
 		pointsPerMushroom, //points awawrded for collecting a mushroom		
 		cam3, //camera is set in third person view or first person view
 		difficultyCycle500, //difficulty increase after every 500 points
@@ -749,7 +750,6 @@ restart=function(){
 	
 	//how the game ended
 	if(fell){
-		points/=5; //punishment for falling
 		showUI('startOverFall');
 	}else{
 		showUI('startOverFadeOut');
@@ -835,17 +835,26 @@ pointParser= function(){
 //definition: showUI  showUI('start');
 showUI = function(action) { 
 	isScenePaused = true;
+	
+	//get current highscore
+	var highscore=getCookie("highscore");
+	if(highscore == "") highscore=0;
+		
 	uiDisplay = document.getElementById("uiTextMain");
 	if (action == 'start') {		
 			//display main info
 		uiDisplay.textContent ="The Glooming Forest";
 			//display additional info
 		uiDisplay = document.getElementById("uiTextInfo");
-		uiDisplay.textContent="Press any non-control key to start the game";
+		uiDisplay.textContent="Controls: Move - up/down arrow, look around - left/right arrow, change camera - c";
 		
 			//display even more info
 		uiDisplay = document.getElementById("uiTextInfo2");
-		uiDisplay.textContent="Controls: Move - up/down arrow, look around - left/right arrow, change camera - c";
+		uiDisplay.textContent="Stay bright as long as you can by collecting mushrooms";
+		
+			//display instructions
+		uiDisplay = document.getElementById("uiTextInfo3");
+		uiDisplay.textContent="Press any non-control key to start the game";
 		
 	} else if (action == 'startOverFall') {
 			//display main info
@@ -855,27 +864,70 @@ showUI = function(action) {
 		uiDisplay = document.getElementById("uiTextInfo");
 		uiDisplay.textContent="Your final score is "+points+" points.";
 		
-			//display even more info
+			//display highscore
 		uiDisplay = document.getElementById("uiTextInfo2");
+		if (points > highscore) {
+			setCookie("highscore",points,356);
+			uiDisplay.textContent="YOU REACHED NEW HIGH SCORE!";
+		} else {
+			uiDisplay.textContent="HIGHSCORE: "+highscore+" points";
+		}
+		
+			//display even more info
+		uiDisplay = document.getElementById("uiTextInfo3");
 		uiDisplay.textContent="Press any non-control key to restart";
 		
 	} else if (action == 'startOverFadeOut') {
 			//display main info
-		uiDisplay.textContent ="You completely fade away - GAME OVER";
+		uiDisplay.textContent ="You completely faded away - GAME OVER";
 		
 			//display additional info
 		uiDisplay = document.getElementById("uiTextInfo");
 		uiDisplay.textContent="Your final score is "+points+" points.";
 		
-			//display even more info
+			//display highscore
 		uiDisplay = document.getElementById("uiTextInfo2");
-		uiDisplay.textContent="";uiDisplay.textContent="Press any non-control key to restart";
+		if (points > highscore){
+			setCookie("highscore",points,356);
+			uiDisplay.textContent="YOU REACHED NEW HIGH SCORE!";
+		} else {
+			uiDisplay.textContent="HIGHSCORE: "+highscore+" points";
+		}
+		
+			//display even more info
+		uiDisplay = document.getElementById("uiTextInfo3");
+		uiDisplay.textContent="Press any non-control key to restart";
 	}
 	
 	uiDisplay = document.getElementById("uiDiv");
 	uiDisplay.style.visibility='visible';
 };
-
+	//source: W3Schools.com
+	//definition: setCookie
+	setCookie=function(cname, cvalue, exdays) {
+		var d = new Date();
+		d.setTime(d.getTime() + (exdays*24*60*60*1000));
+		var expires = "expires="+d.toUTCString();
+		document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+	}
+	
+	//source: W3Schools.com
+	//definition: getCookie
+	getCookie=function (cname) {
+		var name = cname + "=";
+		var ca = document.cookie.split(';');
+		for(var i = 0; i < ca.length; i++) {
+			var c = ca[i];
+			while (c.charAt(0) == ' ') {
+				c = c.substring(1);
+			}
+			if (c.indexOf(name) == 0) {
+				return c.substring(name.length, c.length);
+			}
+		}
+		return "";
+	}
+	
 //on window resize
 //source: http://learningthreejs.com/data/THREEx/docs/THREEx.WindowResize.html
 window.addEventListener('resize', function(){
